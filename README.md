@@ -108,4 +108,4 @@ To modify the difficulty or aesthetics, edit the configuration variables in the 
 
 ## 📄 License
 
-This project is open source and free to use for personal, educational, or therapeutic purposes.
+This project is open source and free to use for personal or educational purposes.
