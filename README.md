@@ -1,4 +1,4 @@
-# Figure Ground Perception Trainer
+# Figure Ground Perception Trainer for post-concussion syndrome
 
 A browser-based visual training tool designed to improve figure-ground discrimination skills. It generates a chaotic, procedurally generated background using the HTML5 Canvas API to camouflage scattered text characters.
 
