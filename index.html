@@ -710,6 +710,10 @@
                     for (let i = 0; i < 5; i++) {
                         setTimeout(() => playTone(toneIndex), i * 120);
                     }
+                    // Stop the timer automatically when z is pressed
+                    if (isRunning) {
+                        toggleTimer();
+                    }
                 } else {
                     playTone(toneIndex);
                 }
