@@ -98,7 +98,7 @@
                             const collRef = collection(db, 'artifacts', appId, 'users', user.uid, 'leaderboard');
                             for (const e of local.slice().reverse()) {
                                 try {
-                                    await addDoc(collRef, { date: serverTimestamp(), duration: e.duration });
+                                    await addDoc(collRef, { date: serverTimestamp(), duration: e.duration, pattern: e.pattern });
                                 } catch (err) {
                                     console.error('Error flushing local entry to server:', err);
                                     break;
@@ -162,27 +162,38 @@
                 
                 const dateObj = score.date && typeof score.date.toDate === 'function' ? score.date.toDate() : new Date(score.date);
                 const dateStr = dateObj && !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—';
+                const patternStr = score.pattern || 'Unknown';
 
                 item.innerHTML = `
                     <span class="lb-time">${formatTime(score.duration)}</span>
+                    <span class="lb-pattern">${patternStr}</span>
                     <span class="lb-date">${dateStr}</span>
                 `;
                 list.appendChild(item);
             });
         }
 
+        function getPatternName() {
+            const names = ['Shapes', 'Lines', 'Strokes'];
+            const name = names[patternType % 3] || 'Unknown';
+            console.debug('getPatternName: patternType=' + patternType + ', name=' + name);
+            return name;
+        }
+
         window.saveTime = async (durationMs) => {
-            const entry = { date: new Date().toISOString(), duration: durationMs };
+            const patternName = getPatternName();
+            console.debug('saveTime called with pattern:', patternName, 'patternType:', patternType);
+            const entry = { date: new Date().toISOString(), duration: durationMs, pattern: patternName };
             try { saveLocalEntry(entry); } catch (e) { console.warn('local cache failed', e); }
 
             // Always perform an optimistic local update so the leaderboard shows immediately
             try {
-                currentLeaderboard.unshift({ id: `local-${Date.now()}`, ...entry });
+                const newEntry = { id: `local-${Date.now()}`, ...entry };
+                currentLeaderboard.unshift(newEntry);
                 if (currentLeaderboard.length > 200) currentLeaderboard.pop();
-                const lbPanel = document.getElementById('leaderboard-panel');
-                if (!lbPanel || !lbPanel.classList.contains('hidden')) {
-                    renderLeaderboard(currentLeaderboard);
-                }
+                // Render immediately to the currentLeaderboard (which now has the new entry)
+                renderLeaderboard(currentLeaderboard);
+                console.debug('Optimistic update rendered, currentLeaderboard length:', currentLeaderboard.length);
             } catch (e) { console.warn('optimistic update failed', e); }
 
             // If auth/db not ready, queue the time for later flushing
@@ -196,8 +207,10 @@
             try {
                 await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'leaderboard'), {
                     date: serverTimestamp(),
-                    duration: durationMs
+                    duration: durationMs,
+                    pattern: patternName
                 });
+                console.debug('Time saved to server with pattern:', patternName);
             } catch (e) {
                 console.error("Error saving time:", e);
                 unsavedTimes.push(durationMs);
@@ -404,9 +417,11 @@
             padding: 8px 0;
             border-bottom: 1px solid #333;
             font-size: 14px;
+            gap: 8px;
         }
         .leaderboard-item:last-child { border-bottom: none; }
         .lb-time { font-family: 'Courier New', monospace; font-weight: bold; color: #f0ad4e; font-size: 16px; }
+        .lb-pattern { color: #aaa; font-size: 13px; }
         .lb-date { color: #888; font-size: 12px; }
         .empty-state { color: #666; font-style: italic; text-align: center; padding: 20px; }
 
@@ -562,8 +577,11 @@
                 
                 if (window.saveTime && elapsed > 100) { 
                     window.saveTime(elapsed);
-                    const lbPanel = document.getElementById('leaderboard-panel');
-                    if(lbPanel.classList.contains('hidden')) togglePanel('leaderboard');
+                    // Wait briefly to ensure data is committed before showing the panel
+                    setTimeout(() => {
+                        const lbPanel = document.getElementById('leaderboard-panel');
+                        if(lbPanel.classList.contains('hidden')) togglePanel('leaderboard');
+                    }, 100);
                 }
 
             } else {
